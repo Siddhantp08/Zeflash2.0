@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Zap, Zap as Bolt, Play, CheckCircle, Microscope, Cpu, Battery, Download, Store } from 'lucide-react';
+import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
 
 const SectionLink: React.FC<{ href: string; label: string; active?: boolean }> = ({ href, label, active }) => (
   <a
@@ -72,12 +73,21 @@ const ZeflashLanding: React.FC = () => {
             <SectionLink href="#why" label="Why Zeflash" active={activeSection==='why'} />
             <Link to="/plans" className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-gray-700 hover:text-blue-700 hover:bg-blue-50">Pricing</Link>
           </nav>
-          <div className="flex items-center gap-2">
-            <Link to="/stations" className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-sm font-semibold px-3 py-2 hover:from-cyan-600 hover:to-blue-700 shadow-md shadow-blue-200/40">
-              <Bolt size={16} /> Quick Test
-            </Link>
-            <Link to={"/"} className="hidden sm:inline-flex items-center gap-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium px-3 py-2 hover:bg-gray-50">
-              Dashboard
+          <div className="flex items-center gap-2 sm:gap-3">
+            <SignedOut>
+              <SignUpButton mode="modal">
+                <button className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs sm:text-sm font-semibold px-3 sm:px-5 py-2 hover:from-purple-600 hover:to-purple-700 shadow-md shadow-purple-200/40 transition-all">
+                  <span className="hidden sm:inline">Sign Up</span>
+                  <span className="sm:hidden">Sign Up</span>
+                </button>
+              </SignUpButton>
+            </SignedOut>
+            <SignedIn>
+              <UserButton />
+            </SignedIn>
+            <Link to="/stations" className="inline-flex items-center gap-1 sm:gap-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs sm:text-sm font-semibold px-2 sm:px-4 py-2 hover:from-cyan-600 hover:to-blue-700 shadow-md shadow-blue-200/40 transition-all">
+              <Bolt size={16} /> 
+              <span className="hidden sm:inline">Quick Test</span>
             </Link>
           </div>
         </div>

@@ -5,6 +5,7 @@ import Papa from 'papaparse';
 import * as mlService from '../services/mlService';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { useUser, SignInButton } from '@clerk/clerk-react';
 import {
   ResponsiveContainer,
   BarChart,
@@ -54,6 +55,7 @@ type Station = {
 };
 
 const ChargingStations: React.FC = () => {
+  const { user, isLoaded } = useUser();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'All' | 'Online' | 'Offline'>('All');
   const [stations, setStations] = useState<Station[]>([]);
@@ -679,23 +681,32 @@ const ChargingStations: React.FC = () => {
                         S3 Path: battery-reports/{reportModal.evseId}_{reportModal.connectorId}/
                       </p>
                     </div>
-                    <button
-                      onClick={() => fetchAIHealthReport(reportModal.evseId)}
-                      disabled={reportModal.aiLoading}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-400 text-white font-semibold rounded-lg transition-all duration-300 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
-                    >
-                      {reportModal.aiLoading ? (
-                        <>
-                          <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
-                          <span>Checking S3 & Generating...</span>
-                        </>
-                      ) : (
-                        <>
+                    {isLoaded && !user ? (
+                      <SignInButton mode="modal">
+                        <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl">
                           <BarChart3 className="w-5 h-5" />
-                          <span>Get AI Health Report</span>
-                        </>
-                      )}
-                    </button>
+                          <span>Sign In to Generate AI Report</span>
+                        </button>
+                      </SignInButton>
+                    ) : (
+                      <button
+                        onClick={() => fetchAIHealthReport(reportModal.evseId)}
+                        disabled={reportModal.aiLoading}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-400 text-white font-semibold rounded-lg transition-all duration-300 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                      >
+                        {reportModal.aiLoading ? (
+                          <>
+                            <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                            <span>Checking S3 & Generating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <BarChart3 className="w-5 h-5" />
+                            <span>Get AI Health Report</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
 
                   {/* AI Health Report Error */}
