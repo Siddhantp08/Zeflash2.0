@@ -6,6 +6,7 @@ import * as mlService from '../services/mlService';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { useUser, SignInButton } from '@clerk/clerk-react';
+import { useAIReportPayment } from '../hooks/useAIReportPayment';
 import {
   ResponsiveContainer,
   BarChart,
@@ -56,10 +57,17 @@ type Station = {
 
 const ChargingStations: React.FC = () => {
   const { user, isLoaded } = useUser();
+  const { initiatePayment } = useAIReportPayment();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'All' | 'Online' | 'Offline'>('All');
   const [stations, setStations] = useState<Station[]>([]);
-  const [reportModal, setReportModal] = useState<{ open: boolean; evseId: string; connectorId: number; data: any; loading: boolean; error: string; aiImageUrl?: string; aiLoading?: boolean; aiError?: string }>({
+  const [tempCouponInput, setTempCouponInput] = useState('');
+  const couponModalRef = useRef<HTMLInputElement>(null);
+  const [couponModalState, setCouponModalState] = useState<{ open: boolean; evseId: string }>({
+    open: false,
+    evseId: ''
+  });
+  const [reportModal, setReportModal] = useState<{ open: boolean; evseId: string; connectorId: number; data: any; loading: boolean; error: string; aiImageUrl?: string; aiLoading?: boolean; aiError?: string; paymentPending?: boolean; paymentError?: string }>({
     open: false,
     evseId: '',
     connectorId: 1,
@@ -68,7 +76,9 @@ const ChargingStations: React.FC = () => {
     error: '',
     aiImageUrl: undefined,
     aiLoading: false,
-    aiError: ''
+    aiError: '',
+    paymentPending: false,
+    paymentError: ''
   });
   const reportContentRef = useRef<HTMLDivElement>(null);
 
@@ -112,23 +122,79 @@ const ChargingStations: React.FC = () => {
     }
   };
 
-  const fetchAIHealthReport = async (evseId: string) => {
-    setReportModal((prev) => ({ ...prev, aiLoading: true, aiError: '', aiImageUrl: '' }));
+  // Coupon validation and pricing function
+  const getCouponInfo = (code: string): { valid: boolean; amount: number; discount: number } => {
+    const upperCode = code.toUpperCase();
+    if (upperCode === 'ZEFLASHCODERS') {
+      return { valid: true, amount: 0, discount: 99 }; // Free for testing
+    } else if (upperCode === 'ZE2026') {
+      return { valid: true, amount: 1, discount: 98 }; // ₹1 for public
+    }
+    return { valid: false, amount: 99, discount: 0 }; // Default price
+  };
+
+  // Handle coupon modal submission
+  const handleCouponSubmit = async () => {
+    const couponInfo = getCouponInfo(tempCouponInput);
     
+    if (!couponInfo.valid && tempCouponInput.trim() !== '') {
+      // Invalid coupon, show error but don't close modal
+      return;
+    }
+
+    // Proceed with payment or AI report generation
+    setCouponModalState({ ...couponModalState, open: false });
+    setTempCouponInput('');
+
+    const evseId = couponModalState.evseId;
+    const deviceId = `${evseId}_${reportModal.connectorId || 1}`;
+
+    if (couponInfo.amount === 0) {
+      // Free coupon - skip payment
+      setReportModal((prev) => ({ ...prev, aiLoading: true, aiError: '', aiImageUrl: '' }));
+      proceedWithAIReport(evseId, deviceId);
+    } else {
+      // Paid coupon or regular - proceed with payment
+      setReportModal((prev) => ({ ...prev, paymentPending: true, paymentError: '', aiError: '', aiImageUrl: '' }));
+      proceedWithPayment(evseId, deviceId, couponInfo.amount, tempCouponInput.toUpperCase());
+    }
+  };
+
+  // Proceed with payment
+  const proceedWithPayment = async (evseId: string, deviceId: string, amount: number, coupon: string) => {
     try {
-      // Get connector ID from modal
+      const paymentSucceeded = await initiatePayment(deviceId, amount, coupon);
+
+      if (!paymentSucceeded) {
+        setReportModal((prev) => ({ ...prev, paymentPending: false, paymentError: 'Payment was cancelled. Please try again.' }));
+        return;
+      }
+
+      setReportModal((prev) => ({ ...prev, paymentPending: false, aiLoading: true, aiError: '', aiImageUrl: '' }));
+      proceedWithAIReport(evseId, deviceId);
+    } catch (error) {
+      console.error('Payment error:', error);
+      setReportModal((prev) => ({
+        ...prev,
+        paymentPending: false,
+        paymentError: 'Failed to initiate payment. Please try again.'
+      }));
+    }
+  };
+
+  // Proceed with AI report generation
+  const proceedWithAIReport = async (evseId: string, deviceId: string) => {
+    try {
       const connectorId = reportModal.connectorId || 1;
-      const deviceId = `${evseId}_${connectorId}`;
       const s3BucketUrl = 'https://battery-ml-results-070872471952.s3.amazonaws.com';
       const imageUrl = `${s3BucketUrl}/battery-reports/${deviceId}/battery_health_report.png?t=${Date.now()}`;
-      
+
       // First, try to load existing image from S3
       try {
         const checkResponse = await fetch(imageUrl, { method: 'HEAD' });
         if (checkResponse.ok) {
-          // Image exists, display it immediately
-          setReportModal((prev) => ({ 
-            ...prev, 
+          setReportModal((prev) => ({
+            ...prev,
             aiImageUrl: imageUrl,
             aiLoading: false,
             aiError: ''
@@ -138,7 +204,7 @@ const ChargingStations: React.FC = () => {
       } catch (headError) {
         console.log('No existing image found, will generate new one');
       }
-      
+
       // No existing image, trigger ML inference
       console.log('Triggering ML inference for:', deviceId);
       const result = await mlService.runInference(
@@ -151,10 +217,10 @@ const ChargingStations: React.FC = () => {
           console.log(`ML Progress: ${status.progress}% - ${status.message}`);
         }
       );
-      
+
       if (result.status === 'completed') {
-        setReportModal((prev) => ({ 
-          ...prev, 
+        setReportModal((prev) => ({
+          ...prev,
           aiImageUrl: imageUrl,
           aiLoading: false,
           aiError: ''
@@ -167,22 +233,27 @@ const ChargingStations: React.FC = () => {
     } catch (error) {
       console.error('AI Health Report Error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to generate AI health report';
-      
-      // Check if it's a network error (backend not reachable)
+
       if (errorMessage.includes('fetch') || errorMessage.includes('NetworkError')) {
-        setReportModal((prev) => ({ 
-          ...prev, 
+        setReportModal((prev) => ({
+          ...prev,
           aiLoading: false,
           aiError: 'Cannot reach ML backend server. Please ensure backend is running on http://localhost:8000'
         }));
       } else {
-        setReportModal((prev) => ({ 
-          ...prev, 
+        setReportModal((prev) => ({
+          ...prev,
           aiLoading: false,
           aiError: errorMessage
         }));
       }
     }
+  };
+
+  // New simplified fetchAIHealthReport - just opens coupon modal
+  const fetchAIHealthReport = async (evseId: string) => {
+    setCouponModalState({ open: true, evseId });
+    setTempCouponInput('');
   };
 
   // These 6 stations are marked as online
@@ -671,7 +742,7 @@ const ChargingStations: React.FC = () => {
                 </div>
               ) : reportModal.data ? (
                 <div className="space-y-4">
-                  {/* Get AI Health Report Button */}
+                  {/* Get AI Health Report Button - Payment Required */}
                   <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-200">
                     <div className="mb-3">
                       <p className="text-sm text-gray-700 mb-1">
@@ -680,7 +751,20 @@ const ChargingStations: React.FC = () => {
                       <p className="text-xs text-gray-600">
                         S3 Path: battery-reports/{reportModal.evseId}_{reportModal.connectorId}/
                       </p>
+                      <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-orange-100 border border-orange-300 rounded-lg">
+                        <Zap className="w-4 h-4 text-orange-600" />
+                        <span className="text-xs font-semibold text-orange-700">₹99 - Premium AI Report</span>
+                      </div>
                     </div>
+
+                    {/* Payment Error */}
+                    {reportModal.paymentError && (
+                      <div className="mb-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p className="text-red-800 text-sm font-semibold">Payment Error</p>
+                        <p className="text-red-700 text-xs mt-1">{reportModal.paymentError}</p>
+                      </div>
+                    )}
+
                     {isLoaded && !user ? (
                       <SignInButton mode="modal">
                         <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl">
@@ -691,13 +775,18 @@ const ChargingStations: React.FC = () => {
                     ) : (
                       <button
                         onClick={() => fetchAIHealthReport(reportModal.evseId)}
-                        disabled={reportModal.aiLoading}
+                        disabled={reportModal.aiLoading || reportModal.paymentPending}
                         className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-400 text-white font-semibold rounded-lg transition-all duration-300 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
                       >
-                        {reportModal.aiLoading ? (
+                        {reportModal.paymentPending ? (
                           <>
                             <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
-                            <span>Checking S3 & Generating...</span>
+                            <span>Processing Payment...</span>
+                          </>
+                        ) : reportModal.aiLoading ? (
+                          <>
+                            <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                            <span>Generating Report...</span>
                           </>
                         ) : (
                           <>
@@ -728,6 +817,17 @@ const ChargingStations: React.FC = () => {
                     </div>
                   )}
 
+                  {/* AI Health Report Loading State */}
+                  {reportModal.aiLoading && (
+                    <div className="border border-gray-200 rounded-lg p-8 bg-white flex items-center justify-center min-h-[300px]">
+                      <div className="flex flex-col items-center justify-center space-y-4">
+                        <div className="animate-spin h-10 w-10 border-3 border-blue-400 border-t-blue-600 rounded-full"></div>
+                        <p className="text-gray-700 font-semibold">Generating AI Report...</p>
+                        <p className="text-gray-600 text-sm">This may take a moment</p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* AI Health Report Image */}
                   {reportModal.aiImageUrl && !reportModal.aiLoading && (
                     <div className="border border-gray-200 rounded-lg p-4 bg-white">
@@ -736,9 +836,14 @@ const ChargingStations: React.FC = () => {
                         src={reportModal.aiImageUrl} 
                         alt="AI Health Report" 
                         className="w-full h-auto rounded-lg shadow-md border border-gray-100"
-                        onError={(e) => {
+                        onError={() => {
                           console.error('Image failed to load:', reportModal.aiImageUrl);
-                          e.currentTarget.src = '/placeholder.svg';
+                          setReportModal((prev) => ({ 
+                            ...prev, 
+                            aiError: 'Failed to load AI report image. The image may still be generating. Please try again in a moment.',
+                            aiLoading: false,
+                            aiImageUrl: ''
+                          }));
                         }}
                       />
                     </div>
@@ -952,6 +1057,116 @@ const ChargingStations: React.FC = () => {
                   )}
                 </div>
               ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Coupon Modal Popup */}
+      {couponModalState.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            {/* Header */}
+            <div className="border-b border-gray-200 p-6 pb-4">
+              <h2 className="text-2xl font-bold text-gray-900">Unlock AI Report</h2>
+              <p className="text-sm text-gray-600 mt-1">Have a coupon code? Enter it below</p>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              {/* Coupon Input */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Coupon Code (Optional)</label>
+                <input
+                  ref={couponModalRef}
+                  type="text"
+                  value={tempCouponInput}
+                  onChange={(e) => setTempCouponInput(e.target.value.toUpperCase())}
+                  placeholder="Enter coupon code"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCouponSubmit();
+                    if (e.key === 'Escape') {
+                      setCouponModalState({ ...couponModalState, open: false });
+                      setTempCouponInput('');
+                    }
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              {/* Coupon validation feedback */}
+              {tempCouponInput && (
+                <div>
+                  {(() => {
+                    const info = getCouponInfo(tempCouponInput);
+                    if (info.valid) {
+                      return (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                          <p className="text-green-800 font-semibold text-sm">✓ Coupon Valid!</p>
+                          <p className="text-green-700 text-xs mt-1">
+                            {info.amount === 0 ? 'Free access - No payment needed' : `Price: ₹${info.amount}`}
+                          </p>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                          <p className="text-red-800 font-semibold text-sm">✗ Invalid Coupon</p>
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+              )}
+
+              {/* Pricing info */}
+              <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-200">
+                <p className="text-sm font-semibold text-gray-900 mb-2">Pricing:</p>
+                <div className="space-y-2 text-sm">
+                  {tempCouponInput ? (
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600">Original Price:</span>
+                        <span className="text-gray-500 line-through">₹99</span>
+                      </div>
+                      {(() => {
+                        const info = getCouponInfo(tempCouponInput);
+                        return (
+                          <div className="flex justify-between items-center font-bold text-lg border-t border-purple-200 pt-2">
+                            <span className="text-gray-900">You Pay:</span>
+                            <span className="text-purple-600">₹{info.amount}</span>
+                          </div>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <div className="flex justify-between items-center font-bold text-lg">
+                      <span className="text-gray-900">Price:</span>
+                      <span className="text-purple-600">₹99</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer/Actions */}
+            <div className="border-t border-gray-200 p-6 flex gap-3">
+              <button
+                onClick={() => {
+                  setCouponModalState({ ...couponModalState, open: false });
+                  setTempCouponInput('');
+                }}
+                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCouponSubmit}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg transition-all shadow-lg hover:shadow-xl"
+              >
+                Continue
+              </button>
             </div>
           </div>
         </div>
