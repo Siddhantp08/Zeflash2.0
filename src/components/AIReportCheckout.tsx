@@ -78,7 +78,9 @@ const AIReportCheckout: React.FC = () => {
         ondismiss: () => {
           setStatus('idle');
         }
-      }
+      },
+      // Enable QR code display on mobile devices
+      upi_qr: true
     };
 
     try {

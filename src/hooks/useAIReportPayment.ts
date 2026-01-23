@@ -68,7 +68,9 @@ export const useAIReportPayment = (): UseAIReportPaymentReturn => {
                 resolveRef.current = null;
               }
             }
-          }
+          },
+          // Enable QR code display on mobile devices
+          upi_qr: true
         };
 
         try {

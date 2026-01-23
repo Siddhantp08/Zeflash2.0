@@ -37,5 +37,6 @@ declare global {
     modal?: {
       ondismiss?: () => void;
     };
+    upi_qr?: boolean;
   }
 }

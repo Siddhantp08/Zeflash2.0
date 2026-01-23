@@ -664,20 +664,83 @@ const ChargingStations: React.FC = () => {
                   onClick={async () => {
                     if (!reportContentRef.current || !reportModal.data?.data) return;
                     try {
-                      const canvas = await html2canvas(reportContentRef.current, {
+                      // Store original dimensions
+                      const element = reportContentRef.current;
+                      const originalWidth = element.style.width;
+                      const originalHeight = element.style.height;
+                      const originalMaxHeight = element.parentElement?.style.maxHeight;
+                      
+                      // Temporarily expand to capture full content
+                      if (element.parentElement) {
+                        element.parentElement.style.maxHeight = 'none';
+                      }
+                      element.style.width = '297mm'; // A4 width in mm
+                      element.style.height = 'auto';
+
+                      // Wait for layout to settle
+                      await new Promise(resolve => setTimeout(resolve, 500));
+
+                      const canvas = await html2canvas(element, {
                         scale: 2,
                         logging: false,
-                        useCORS: true
+                        useCORS: true,
+                        allowTaint: true,
+                        backgroundColor: '#ffffff'
                       });
+
+                      // Restore original dimensions
+                      element.style.width = originalWidth;
+                      element.style.height = originalHeight;
+                      if (element.parentElement) {
+                        element.parentElement.style.maxHeight = originalMaxHeight || '';
+                      }
+
                       const imgData = canvas.toDataURL('image/png');
                       const pdf = new jsPDF({
-                        orientation: 'landscape',
+                        orientation: 'portrait',
                         unit: 'mm',
                         format: 'a4'
                       });
-                      const imgWidth = 297;
+                      
+                      const pageWidth = pdf.internal.pageSize.getWidth();
+                      const pageHeight = pdf.internal.pageSize.getHeight();
+                      const imgWidth = pageWidth - 10; // 5mm margins
                       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+
+                      let position = 5; // Top margin
+                      let heightLeft = imgHeight;
+
+                      // Add pages if content is longer than one page
+                      let page = 1;
+                      while (heightLeft > 0) {
+                        const pageHeightAvailable = pageHeight - 10; // 5mm margins
+                        
+                        if (position + heightLeft > pageHeight) {
+                          // Calculate how much of the image fits on this page
+                          const heightToPrint = pageHeightAvailable - (position - 5);
+                          
+                          pdf.addImage(
+                            imgData,
+                            'PNG',
+                            5,
+                            position,
+                            imgWidth,
+                            heightToPrint
+                          );
+                          
+                          heightLeft -= heightToPrint;
+                          position = 5;
+                          
+                          if (heightLeft > 0) {
+                            pdf.addPage();
+                            page++;
+                          }
+                        } else {
+                          pdf.addImage(imgData, 'PNG', 5, position, imgWidth, imgHeight);
+                          heightLeft = 0;
+                        }
+                      }
+
                       pdf.save(`charger_report_${reportModal.evseId}_${reportModal.connectorId}_${new Date().toISOString().slice(0, 10)}.pdf`);
                     } catch (error) {
                       console.error('Error generating PDF:', error);
