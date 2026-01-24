@@ -70,7 +70,12 @@ const ZeflashLanding: React.FC = () => {
             <SectionLink href="#science" label="Science Inside" active={activeSection==='science'} />
             <SectionLink href="#who" label="Who it's for" active={activeSection==='who'} />
             <SectionLink href="#why" label="Why Zeflash" active={activeSection==='why'} />
-            <Link to="/plans" className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-green-700 hover:text-green-800 hover:bg-green-50">Pricing</Link>
+            <Link
+              to="/plans"
+              className="px-3 py-1.5 rounded-md text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-md shadow-emerald-200/30 transition-all"
+            >
+              Pricing
+            </Link>
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
             <SignedOut>
