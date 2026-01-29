@@ -1,8 +1,6 @@
-const fetch = require('node-fetch');
-
 const ML_BACKEND_URL = 'http://battery-ml-alb-1652817744.us-east-1.elb.amazonaws.com';
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -39,4 +37,4 @@ module.exports = async (req, res) => {
       message: error.message 
     });
   }
-};
+}
