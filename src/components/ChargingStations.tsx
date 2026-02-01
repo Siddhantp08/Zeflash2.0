@@ -61,6 +61,7 @@ const ChargingStations: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'All' | 'Online' | 'Offline'>('All');
   const [stations, setStations] = useState<Station[]>([]);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [tempCouponInput, setTempCouponInput] = useState('');
   const couponModalRef = useRef<HTMLInputElement>(null);
   const [couponModalState, setCouponModalState] = useState<{ open: boolean; evseId: string }>({
@@ -273,6 +274,37 @@ const ChargingStations: React.FC = () => {
     );
   };
 
+  // Calculate distance between two coordinates using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Get user's current location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.log('Geolocation error:', error.message);
+          // Silently fail - user denied permission or location unavailable
+        }
+      );
+    }
+  }, []);
+
   useEffect(() => {
     const csvPath = '/device_locations_api - Stations.csv';
     const url = encodeURI(csvPath);
@@ -356,7 +388,7 @@ const ChargingStations: React.FC = () => {
 
   const filteredStations = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return stations.filter((station) => {
+    const filtered = stations.filter((station) => {
       const matchesSearch =
         !term ||
         station.name.toLowerCase().includes(term) ||
@@ -371,7 +403,49 @@ const ChargingStations: React.FC = () => {
 
       return matchesSearch && matchesStatus;
     });
-  }, [searchTerm, filterStatus, stations]);
+
+    // Sort by distance if user location is available
+    if (userLocation) {
+      return filtered.sort((a, b) => {
+        // Calculate distance from user to each station
+        const distanceA = calculateDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          a.latitude,
+          a.longitude
+        );
+        const distanceB = calculateDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          b.latitude,
+          b.longitude
+        );
+
+        // Sort by distance first (nearest first)
+        const distanceDiff = distanceA - distanceB;
+        if (Math.abs(distanceDiff) > 0.5) { // If distance difference > 0.5km, prioritize by distance
+          return distanceDiff;
+        }
+
+        // If distances are similar, use the original sorting (city order, then name)
+        const cityOrder = (s: Station) => {
+          const city = s.city.toLowerCase();
+          const state = s.state.toLowerCase();
+          if (city.includes('delhi') || state.includes('delhi')) return 0;
+          if (city.includes('chandigarh') || state.includes('chandigarh')) return 1;
+          if (state.includes('uttarakhand') || state.includes('uttrakhand') || city.includes('dehradun')) return 2;
+          return 3;
+        };
+        const pa = cityOrder(a);
+        const pb = cityOrder(b);
+        if (pa !== pb) return pa - pb;
+        const c = a.city.localeCompare(b.city);
+        return c !== 0 ? c : a.name.localeCompare(b.name);
+      });
+    }
+
+    return filtered;
+  }, [searchTerm, filterStatus, stations, userLocation]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
@@ -478,13 +552,32 @@ const ChargingStations: React.FC = () => {
         {filteredStations.length > 0 ? (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
-              {filteredStations.map((station) => {
+              {filteredStations.map((station, index) => {
                 const stationOnline = isStationOnline(station.name);
+                const isTop3Nearby = userLocation && index < 3;
+                const distance = userLocation ? calculateDistance(
+                  userLocation.latitude,
+                  userLocation.longitude,
+                  station.latitude,
+                  station.longitude
+                ) : null;
                 return (
                 <div
                   key={station.id}
-                  className="bg-white rounded-2xl border-2 border-blue-100 shadow-lg hover:shadow-2xl hover:border-blue-300 transition-all duration-300 overflow-hidden flex flex-col min-h-[280px] group"
+                  className={`bg-white rounded-2xl border-2 shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden flex flex-col min-h-[280px] group relative ${
+                    isTop3Nearby 
+                      ? 'border-blue-500 ring-2 ring-blue-400 hover:ring-blue-500 shadow-blue-200/50' 
+                      : 'border-blue-100 hover:border-blue-300'
+                  }`}
                 >
+                  {/* Top 3 Nearby Badge */}
+                  {isTop3Nearby && (
+                    <div className="absolute top-3 right-3 z-10 bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>#{index + 1} Nearest</span>
+                    </div>
+                  )}
+                  
                   {/* Status Badge */}
                   <div className={`h-1.5 ${stationOnline ? 'bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500' : 'bg-gradient-to-r from-gray-400 via-gray-500 to-gray-600'}`} />
 
@@ -504,6 +597,19 @@ const ChargingStations: React.FC = () => {
                         <MapPin className="w-3.5 h-3.5 text-blue-500" />
                         <span className="truncate">{station.city}{station.city && station.state ? ', ' : ''}{station.state}</span>
                       </div>
+                      
+                      {/* Distance Display */}
+                      {distance !== null && (
+                        <div className={`mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          isTop3Nearby 
+                            ? 'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-800 border border-blue-400'
+                            : 'bg-blue-50 text-blue-700 border border-blue-200'
+                        }`}>
+                          <MapPin className="w-3 h-3" />
+                          <span>{distance < 1 ? `${(distance * 1000).toFixed(0)}m` : `${distance.toFixed(1)}km`} away</span>
+                        </div>
+                      )}
+                      
                       {station.latitude && station.longitude ? (
                         <div className="mt-2">
                           <a
