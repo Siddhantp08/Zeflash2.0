@@ -239,6 +239,48 @@ const ZeflashLanding: React.FC = () => {
         </div>
       </section>
 
+      {/* Our Other Services */}
+      <section id="why" className="py-12 sm:py-16 bg-gradient-to-b from-blue-50 to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <h2 className="text-2xl sm:text-3xl font-bold mb-6">Our Other Services</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {[{
+              name: 'ZipsureAI',
+              href: 'https://zipsureai.com/',
+              desc: 'AI-powered battery intelligence and safety analytics for fleets, OEMs, and energy operators.',
+              accent: 'from-indigo-500 to-blue-600'
+            }, {
+              name: 'EVCHAMP',
+              href: 'https://evchamp.in/',
+              desc: 'Smart EV charging network with seamless booking, monitoring, and uptime-first operations.',
+              accent: 'from-emerald-500 to-green-600'
+            }].map((item) => (
+              <a
+                key={item.name}
+                href={item.href}
+                target="_blank"
+                rel="noreferrer"
+                className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
+              >
+                <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-r ${item.accent} blur-3xl`} aria-hidden />
+                <div className="relative">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-800">
+                    <CheckCircle size={14} className="text-emerald-600" />
+                    {item.name}
+                  </div>
+                  <p className="mt-3 text-gray-900 text-lg font-semibold">{item.name}</p>
+                  <p className="mt-2 text-gray-700 text-sm leading-relaxed">{item.desc}</p>
+                  <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-700 group-hover:text-blue-800">
+                    Visit site
+                    <span aria-hidden>→</span>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Features */}
       <section id="features" className="py-12 sm:py-16 bg-gradient-to-b from-blue-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -304,48 +346,6 @@ const ZeflashLanding: React.FC = () => {
             <li className="bg-gray-50 border border-gray-200 rounded-xl p-4"><span className="font-semibold">Second-Life & Recyclers:</span> Verify pack health without dismantling; certify for reuse or recycling.</li>
             <li className="bg-gray-50 border border-gray-200 rounded-xl p-4"><span className="font-semibold">OEMs, Insurance & Manufacturers:</span> On-demand diagnostics and insights for design, passports, insurance and warranties.</li>
           </ul>
-        </div>
-      </section>
-
-      {/* Why choose */}
-      <section id="why" className="py-12 sm:py-16 bg-gradient-to-b from-blue-50 to-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl sm:text-3xl font-bold mb-6">Our Other Services</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {[{
-              name: 'ZipsureAI',
-              href: 'https://zipsureai.com/',
-              desc: 'AI-powered battery intelligence and safety analytics for fleets, OEMs, and energy operators.',
-              accent: 'from-indigo-500 to-blue-600'
-            }, {
-              name: 'EVCHAMP',
-              href: 'https://evchamp.in/',
-              desc: 'Smart EV charging network with seamless booking, monitoring, and uptime-first operations.',
-              accent: 'from-emerald-500 to-green-600'
-            }].map((item) => (
-              <a
-                key={item.name}
-                href={item.href}
-                target="_blank"
-                rel="noreferrer"
-                className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
-              >
-                <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-r ${item.accent} blur-3xl`} aria-hidden />
-                <div className="relative">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-800">
-                    <CheckCircle size={14} className="text-emerald-600" />
-                    {item.name}
-                  </div>
-                  <p className="mt-3 text-gray-900 text-lg font-semibold">{item.name}</p>
-                  <p className="mt-2 text-gray-700 text-sm leading-relaxed">{item.desc}</p>
-                  <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-700 group-hover:text-blue-800">
-                    Visit site
-                    <span aria-hidden>→</span>
-                  </div>
-                </div>
-              </a>
-            ))}
-          </div>
         </div>
       </section>
 

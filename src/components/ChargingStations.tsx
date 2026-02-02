@@ -129,8 +129,8 @@ const ChargingStations: React.FC = () => {
     const upperCode = code.toUpperCase();
     if (upperCode === 'ZEFLASHCODERS') {
       return { valid: true, amount: 0, discount: 99 }; // Free for testing
-    } else if (upperCode === 'ZE2026') {
-      return { valid: true, amount: 1, discount: 98 }; // ₹1 for public
+    } else if (upperCode === 'TESTCHARJ') {
+      return { valid: true, amount: 59, discount: 40 }; // ₹59 (₹40 off)
     }
     return { valid: false, amount: 99, discount: 0 }; // Default price
   };
