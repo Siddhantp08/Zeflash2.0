@@ -3,7 +3,6 @@
 
 export default async function handler(req, res) {
   // Get backend URL from environment variable
-  // This should be set in Vercel: VITE_ML_BACKEND_URL=http://13.219.229.219:8000
   const ML_BACKEND_URL = process.env.VITE_ML_BACKEND_URL || 'http://localhost:8000';
   
   // Enable CORS
@@ -17,11 +16,29 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Get the full path from query parameter (e.g., /api/v1/inference/trigger)
-    const path = req.url.replace('/api/ml-proxy', '') || '/';
+    // In Vercel, req.url is the full path like /api/ml-proxy/api/v1/inference/trigger
+    // We need to extract everything after /api/ml-proxy
+    let path = req.url || '/';
+    
+    // Remove /api/ml-proxy prefix if present
+    if (path.startsWith('/api/ml-proxy')) {
+      path = path.substring('/api/ml-proxy'.length);
+    }
+    
+    // Ensure path starts with /
+    if (!path.startsWith('/')) {
+      path = '/' + path;
+    }
+    
     const targetUrl = `${ML_BACKEND_URL}${path}`;
     
-    console.log('🔄 ML Proxy:', req.method, targetUrl);
+    console.log('🔄 ML Proxy Request:', {
+      method: req.method,
+      originalUrl: req.url,
+      extractedPath: path,
+      targetUrl: targetUrl,
+      backend: ML_BACKEND_URL
+    });
 
     const options = {
       method: req.method || 'GET',
