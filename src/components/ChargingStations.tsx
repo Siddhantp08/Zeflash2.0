@@ -191,9 +191,10 @@ const ChargingStations: React.FC = () => {
     try {
       const connectorId = reportModal.connectorId || 1;
       
-      // Detect if running locally or in production
-      const ML_API_URL = import.meta.env.VITE_ML_API_URL || 'http://localhost:8000';
-      const isLocalhost = ML_API_URL.includes('localhost') || ML_API_URL.includes('127.0.0.1');
+      // Use /api/ml-proxy in production (Vercel), localhost in development
+      const isDev = import.meta.env.DEV;
+      const ML_API_URL = isDev ? 'http://localhost:8000' : '/api/ml-proxy';
+      const isLocalhost = isDev;
       
       // Use local backend endpoint for localhost, S3 for production
       const imageUrl = isLocalhost

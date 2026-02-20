@@ -480,9 +480,10 @@ const BatteryReport: React.FC = () => {
         }
       );
 
-      // Detect if running locally or in production
-      const ML_API_URL = import.meta.env.VITE_ML_API_URL || 'http://localhost:8000';
-      const isLocalhost = ML_API_URL.includes('localhost') || ML_API_URL.includes('127.0.0.1');
+      // Use /api/ml-proxy in production (Vercel), localhost in development
+      const isDev = import.meta.env.DEV;
+      const ML_API_URL = isDev ? 'http://localhost:8000' : '/api/ml-proxy';
+      const isLocalhost = isDev;
       
       const deviceId = `${evseId}_${connectorId}`;
       
@@ -532,9 +533,10 @@ const BatteryReport: React.FC = () => {
       setMlReport(prev => ({ ...prev, loading: true }));
 
       try {
-        // Detect if running locally or in production
-        const ML_API_URL = import.meta.env.VITE_ML_API_URL || 'http://localhost:8000';
-        const isLocalhost = ML_API_URL.includes('localhost') || ML_API_URL.includes('127.0.0.1');
+        // Use /api/ml-proxy in production (Vercel), localhost in development
+        const isDev = import.meta.env.DEV;
+        const ML_API_URL = isDev ? 'http://localhost:8000' : '/api/ml-proxy';
+        const isLocalhost = isDev;
         
         const deviceId = `${evseId}_${connectorId}`;
         

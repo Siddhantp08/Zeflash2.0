@@ -2,7 +2,9 @@
  * ML Service - Frontend API client for Battery Health ML inference
  */
 
-const ML_API_URL = import.meta.env.VITE_ML_API_URL || 'http://localhost:8000';
+// Use /api/ml-proxy in production (Vercel), localhost in development
+const isDev = import.meta.env.DEV;
+const ML_API_URL = isDev ? 'http://localhost:8000' : '/api/ml-proxy';
 
 export interface InferenceRequest {
   evse_id: string;
