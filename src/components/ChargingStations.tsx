@@ -216,7 +216,7 @@ const ChargingStations: React.FC = () => {
         {
           evse_id: evseId,
           connector_id: connectorId,
-          limit: 60
+          limit: 100
         },
         (status) => {
           console.log(`ML Progress: ${status.progress}% - ${status.message}`);
