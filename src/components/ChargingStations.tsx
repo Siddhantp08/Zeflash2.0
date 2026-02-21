@@ -192,26 +192,12 @@ const ChargingStations: React.FC = () => {
       const connectorId = reportModal.connectorId || 1;
       
       // Use S3 for production and testing (images are uploaded there)
+      // Add timestamp to force fresh data and bypass browser caching
       const imageUrl = `https://battery-ml-results-test.s3.us-east-1.amazonaws.com/battery-reports/${deviceId}/battery_health_report.png?t=${Date.now()}`;
 
-      // First, try to load existing image
-      try {
-        const checkResponse = await fetch(imageUrl, { method: 'HEAD' });
-        if (checkResponse.ok) {
-          setReportModal((prev) => ({
-            ...prev,
-            aiImageUrl: imageUrl,
-            aiLoading: false,
-            aiError: ''
-          }));
-          return;
-        }
-      } catch (headError) {
-        console.log('No existing image found, will generate new one');
-      }
-
-      // No existing image, trigger ML inference
-      console.log('Triggering ML inference for:', deviceId);
+      // Always trigger fresh ML inference to get latest analysis
+      // (do not use cached images - user wants up-to-date report)
+      console.log('Triggering fresh ML inference for:', deviceId);
       const result = await mlService.runInference(
         {
           evse_id: evseId,
